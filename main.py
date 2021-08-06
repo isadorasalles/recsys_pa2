@@ -8,4 +8,10 @@ if __name__ == "__main__":
     contents_path = sys.argv[1]
     ratings_path = sys.argv[2]
     targets_path = sys.argv[3]
-    Content().read_content(contents_path)
+    content = Content()
+    # content.read_content(contents_path)
+    content.read_ratings(ratings_path)
+    content.read_content(contents_path)
+    content.compute_user_vectors()
+    content.submission(targets_path)
+
