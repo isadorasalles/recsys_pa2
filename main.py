@@ -12,6 +12,6 @@ if __name__ == "__main__":
     # content.read_content(contents_path)
     content.read_ratings(ratings_path)
     content.read_content(contents_path)
-    content.compute_user_vectors()
-    content.submission(targets_path)
+    # content.compute_user_vectors()
+    # content.submission(targets_path)
 
