@@ -237,22 +237,22 @@ class Content():
         
         return numerador/sim_sum
 
-    def input_avg_rating_user(self, userid):
+    def input_avg_rating_user(self, userid, itemid):
         prediction = 0
         sum_weights = 0
         for item, rating in self.user_ratings[userid].items():
-            if item in self.imdbRating.keys():
-            #     sum_weights += self.imdbRating[item]
-                prediction += (rating+self.imdbRating[item])/2
-            else:
-                # sum_weights += 1
-                prediction += rating
+            prediction += rating
         prediction /= len(self.user_ratings[userid])
+
+        if itemid in self.imdbRating.keys():
+            prediction += self.imdbRating[itemid]
+            prediction /= 2
+        
         return prediction
 
     def aggregate_predictions(self, predictions):
         # ['Plot', 'Genre', 'Director', 'Year', 'Actors', 'Writer']
-        weights = [4, 3, 2, 4, 2, 2]
+        weights = [4, 3, 3, 4, 2, 2]
         weighted_sum = 0
         for i, pred in enumerate(predictions):
             weighted_sum += weights[i]*pred
@@ -278,7 +278,7 @@ class Content():
                         if pred != 0:
                             predictions.append(pred)
                     if pred == 0 or self.item_norms[feature][itemid] == 0:
-                        predictions.append(self.input_avg_rating_user(userid))
+                        predictions.append(self.input_avg_rating_user(userid, itemid))
             
                 prediction = self.aggregate_predictions(predictions)
 
@@ -294,3 +294,4 @@ class Content():
                 prediction = self.imdbAvgRating/len(self.imdbRating)
 
             print("{}:{},{}".format(userid, itemid, prediction))
+        
