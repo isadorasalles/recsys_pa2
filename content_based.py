@@ -78,7 +78,6 @@ class Content():
     def preprocessing(self, content, itemid):
         content_tokenized = {}
         
-        # del_features = ["Title", "Director", "Actors", "Writer", "Year", "Plot", "Rated", "Released", "Runtime", "Language", "Country", "Awards", "Poster", "Metascore", "imdbRating", "imdbVotes", "imdbID", "seriesID", "Type", "Response"]
         #del_features = ['seriesID', 'Writer', 'Runtime', 'Language', 'Metascore', 'Title', 'Poster', 'Season', 
                     #'Director', 'imdbID', 'Response', 'Genre', 'imdbVotes', 'Episode', 'Year', 'Rated', 
                     # 'Plot', 'Released', 'Country', 'Actors', 'imdbRating', 'Type', 'Awards', 'Error']
@@ -86,71 +85,22 @@ class Content():
                         'Director', 'imdbID', 'Response', 'imdbVotes', 'Episode', 'Year', 'Rated', 'Genre',
                         'Released', 'Country', 'Actors', 'imdbRating', 'Type', 'Awards', 'Error']
 
+        content_tokenized['Plot'] = []
         if 'Plot' in content.keys():
             description = self.preprocess_text(content['Plot'])
             tokens = self.tokenize(description, sep=' ')
             content_tokenized['Plot'] = tokens
-        if 'imdbRating' in content.keys():
+            self.unique_words.update(tokens)
+
+        if 'imdbRating' in content.keys() and content['imdbRating'] != 'N/A':
             self.imdbRating[itemid] = content['imdbRating']
             self.imdbAvgRating += float(content['imdbRating'])
-        
-        # for key in content.keys():
-        #     description = content[key]
-
-        #     if description != 'N/A': # and key == "Plot":
-        #         if key == "imdbRating":
-        #             self.imdbRating[itemid] = content[key]
-        #             self.imdbAvgRating += float(content[key])
-        #         # print(content[key])
-        #         # print(description)
-        #         if key == 'Director' or key == 'Actors' or key == 'Writer':  # como tratar os dados de nomes
-        #             if '(' in description:
-        #                 flag_erase = 0
-        #                 s = list(description)
-        #                 for i in range(len(description)):
-        #                     if description[i] == '(':
-        #                         flag_erase = 1
-        #                     if flag_erase == 1:
-        #                         s[i] = ''
-        #                     if description[i] == ')':
-        #                         flag_erase = 0
-        #                 description = "".join(s)
-        #             description = re.sub('([A-Z]{1})', r'_\1', description).lower()
-        #             tokens = self.tokenize(description, sep=',')
-        #             tokens = [self.preprocess_text(token).replace(' ', '') for token in tokens]
-        #         else:
-        #             description = self.preprocess_text(content[key])
-        #             tokens = self.tokenize(description, sep=' ')
-
-        #         if key not in del_features:
-        #             self.unique_words.update(tokens)
-
-        #         if key == 'Genre':
-        #             for token in tokens:
-        #                 if content['imdbRating'] != 'N/A':
-        #                     try:
-        #                         self.gendersAvgRating[token].append(float(content['imdbRating']))
-        #                     except:
-        #                         self.gendersAvgRating[token] = []
-        #                         self.gendersAvgRating[token].append(float(content['imdbRating']))
-                    
-        #         content_tokenized[key] = tokens
-            
-        # content = []
-        # # print(content_tokenized.keys())
-        # for key in content_tokenized.keys():
-        #     if key not in del_features:
-        #         content.extend(content_tokenized[key])
-        
-        # for key in self.gendersAvgRating.keys():
-        #     self.gendersAvgRating[key] = np.mean(self.gendersAvgRating[key])
 
         return content_tokenized['Plot']
 
     def count_occurencies(self, tokens):
         tokenCount = {} #dict.fromkeys(np.unique(tokens), 0) 
         for token in tokens:
-            # if token in self.unique_words:
             try: 
                 tokenCount[token] += 1
             except:
@@ -218,43 +168,29 @@ class Content():
                     continue
                 itemid = content.split(',')[0]
                 self.contents[itemid] = self.preprocessing(json.loads(content[9:]), itemid)
-                print(self.contents[itemid])
-                break
+
         # print(self.unique_words)
         # print(len(self.unique_words))
-        # self.item_vectors, self.item_norms = self.compute_tf_idf()
+        self.item_vectors, self.item_norms = self.compute_tf_idf()
 
     
     def cosine_similarity(self, id1, id2):
         sim = 0
         for term in self.item_vectors[id1].keys():
-            if term in self.item_vectors[id2].keys():
+            if term in self.item_vectors[id2]:
                 sim += self.item_vectors[id1][term] * self.item_vectors[id2][term] 
 
         if sim == 0:
+            # print(id1)
             return 0
         
         return sim/(self.item_norms[id1] * self.item_norms[id2])
 
-    # def compute_user_vectors(self):
-    #     self.user_vectors = {}
-    #     for userid, items in self.user_ratings.items():
-    #         self.user_vectors[userid] = {} #np.zeros(len(self.unique_words))
-    #         for itemid, rating in items.items():
-    #             # print(self.item_vectors[itemid].values())
-    #             # print(type(self.item_vectors[itemid].values()))
-    #             # print(len(self.user_vectors[userid]))
-    #             for term, value in self.item_vectors[itemid].items():
-    #                 try: 
-    #                     self.user_vectors[userid][term] += (value*rating)/len(items)
-    #                 except:
-    #                     self.user_vectors[userid][term] = (value*rating)/len(items)
-    #             # self.user_vectors[userid] += np.array(list(self.item_vectors[itemid].values()))*rating
-    #         # self.user_vectors[userid] /= len(items)
-
     def prediction(self, userid, itemid):
         sim_sum = 0
         numerador = 0
+        # print(self.user_ratings[userid])
+        
         for item, rating in self.user_ratings[userid].items():
             if self.item_norms[item] != 0:
                 sim = self.cosine_similarity(item, itemid)
@@ -262,11 +198,18 @@ class Content():
                 numerador += sim*rating
 
         if sim_sum == 0:
+            # print(itemid)
             return 0
         
         return numerador/sim_sum
 
-    
+    def input_avg_rating_user(self, userid):
+        prediction = 0
+        for item, rating in self.user_ratings[userid].items():
+            prediction += rating
+        prediction /= len(self.user_ratings[userid])
+        return prediction
+
     def submission(self, targets_path):
         ''' Essa funcao itera pelas tuplas de usuarios e itens disponiveis no targets.csv
             e realiza a predicao para cada uma delas '''
@@ -279,37 +222,21 @@ class Content():
             userid = row[1].split(":")[0]
             itemid = row[1].split(":")[1]
 
-            if userid in self.user_ratings.keys() and self.item_norms[itemid] != 0:
-                prediction = self.prediction(userid, itemid)
+            if userid in self.user_ratings.keys():
+                if self.item_norms[itemid] != 0:
+                    prediction = self.prediction(userid, itemid)
+                if prediction == 0 or self.item_norms[itemid] == 0:
+                    prediction = self.input_avg_rating_user(userid)
          
                 if prediction > 10:
                     prediction = 10
                 elif prediction < 0:
                     prediction = 0
-            
-            # item possui norma igual a 0
-            elif userid in self.user_ratings.keys(): 
-                prediction = 0
-                for item, rating in self.user_ratings[userid].items():
-                    prediction += rating
-                prediction /= len(self.user_ratings[userid])
 
             # cold-start de usuario
             elif itemid in self.imdbRating.keys():
-                # print(itemid)
-                # print(self.imdbRating)
                 prediction = self.imdbRating[itemid]
             else:
-                # prediction = 0
-                # for genre in self.contents[itemid]:
-                #     if genre in self.gendersAvgRating.keys():
-                #         prediction += self.gendersAvgRating[genre]
-                # if len(self.contents[itemid]) == 0:
-                #     print(itemid)
-                # print(self.contents[itemid])
-                # prediction /= len(self.contents[itemid])
-                # print(prediction)
-                # break
                 prediction = self.imdbAvgRating/len(self.imdbRating)
 
             print("{}:{},{}".format(userid, itemid, prediction))
