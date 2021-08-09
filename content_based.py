@@ -237,7 +237,7 @@ class Content():
     def aggregate_predictions(self, predictions):
         # ['Plot', 'Genre', 'Director', 'Year', 'Actors', 'Writer']
         # ['Plot', 'Genre', 'Director', 'Year', 'Actors', 'Writer', 'Title']
-        weights = [4, 3, 4, 5, 3, 2, 1]
+        weights = [4, 3, 4, 5, 3, 3, 4] 
         weighted_sum = 0
         for i, pred in enumerate(predictions):
             weighted_sum += weights[i]*pred
