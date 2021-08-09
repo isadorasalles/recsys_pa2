@@ -10,6 +10,7 @@ class Content():
 
     def __init__(self):
         self.unique_words = set()
+        self.features = ['Plot', 'Genre', 'Director', 'Year', 'Actors', 'Writer']
 
     def read_ratings(self, ratings_path):
         ''' Essa funcao faz um pre-processamento do CSV que contem os ratings'''
@@ -84,32 +85,43 @@ class Content():
         del_features = ['seriesID', 'Writer', 'Runtime', 'Language', 'Metascore', 'Title', 'Poster', 'Season', 
                         'Director', 'imdbID', 'Response', 'imdbVotes', 'Episode', 'Year', 'Rated', 'Genre',
                         'Released', 'Country', 'Actors', 'imdbRating', 'Type', 'Awards', 'Error']
+        for key in self.features:
+            if key not in content.keys() or content[key] == 'N/A':
+                content_tokenized[key] = []
+                continue
+            if key == 'Director' or key == 'Actors' or key == 'Writer':
+                text = content[key]
+                if '(' in text:
+                    flag_erase = 0
+                    s = list(text)
+                    for i in range(len(text)):
+                        if text[i] == '(':
+                            flag_erase = 1
+                        if flag_erase == 1:
+                            s[i] = ''
+                        if text[i] == ')':
+                            flag_erase = 0
+                    text = "".join(s)
+                # preprocessed_text = self.preprocess_text(text)
+                content_tokenized[key] = self.tokenize(text.lower(), sep=',')
+           
+            elif key == 'Year':
+                year = content[key][:3]
+                content_tokenized[key] = [year]
+                # print(content_tokenized['Year'])
+                # self.unique_words.add(year)
 
-        content_tokenized['Plot'] = []
-        if 'Plot' in content.keys() and content['Plot'] != 'N/A':
-            # if key == 'Director' or key == 'Actors' or key == 'Writer':  # como tratar os dados de nomes
-            # description = content['Director']
-            # if '(' in description:
-            #     flag_erase = 0
-            #     s = list(description)
-            #     for i in range(len(description)):
-            #         if description[i] == '(':
-            #             flag_erase = 1
-            #         if flag_erase == 1:
-            #             s[i] = ''
-            #         if description[i] == ')':
-            #             flag_erase = 0
-            #     description = "".join(s)
-            description = self.preprocess_text(content['Plot'])
-            tokens = self.tokenize(description, sep=' ')
-            content_tokenized['Plot'] = tokens
-            self.unique_words.update(tokens)
+            else: 
+                description = self.preprocess_text(content[key])
+                tokens = self.tokenize(description, sep=' ')
+                content_tokenized[key] = tokens
+                # self.unique_words.update(tokens)
 
         if 'imdbRating' in content.keys() and content['imdbRating'] != 'N/A':
             self.imdbRating[itemid] = float(content['imdbRating'])
             self.imdbAvgRating += float(content['imdbRating'])
 
-        return content_tokenized['Plot']
+        return content_tokenized
 
     def count_occurencies(self, tokens):
         tokenCount = {} #dict.fromkeys(np.unique(tokens), 0) 
@@ -121,10 +133,11 @@ class Content():
         
         return tokenCount
 
-    def document_frequency(self):
+    def document_frequency(self, feature):
         # number of documents that the word appears
         docFreq = {}
-        for item, tokens in self.contents.items():
+        for item, values in self.contents.items():
+            tokens = self.contents[item][feature]
             for w in np.unique(tokens):
                 try:
                     docFreq[w] += 1
@@ -132,9 +145,9 @@ class Content():
                     docFreq[w] = 1
         return docFreq
     
-    def compute_idf(self):
+    def compute_idf(self, feature):
         start = time.time()
-        docFreq = self.document_frequency()
+        docFreq = self.document_frequency(feature)
         end = time.time() - start
 
         idf = {}
@@ -144,14 +157,15 @@ class Content():
         return idf
 
 
-    def compute_tf_idf(self):
+    def compute_tf_idf(self, feature):
         start = time.time()
-        idf = self.compute_idf()
+        idf = self.compute_idf(feature)
         end = time.time() - start
         tf_idf = {}
         start = time.time()
         tf_idf_norm = {}
-        for item, tokens in self.contents.items():
+        for item, values in self.contents.items():
+            tokens = self.contents[item][feature]
             tf_idf[item] = {} 
             tf_idf_norm[item] = 0
             if tokens == []:
@@ -184,29 +198,36 @@ class Content():
 
         # print(self.unique_words)
         # print(len(self.unique_words))
-        self.item_vectors, self.item_norms = self.compute_tf_idf()
+        self.item_vectors = {}
+        self.item_norms = {}
+        self.item_vectors['Plot'], self.item_norms['Plot'] = self.compute_tf_idf('Plot')
+        self.item_vectors['Genre'], self.item_norms['Genre'] = self.compute_tf_idf('Genre')
+        self.item_vectors['Year'], self.item_norms['Year'] = self.compute_tf_idf('Year')
+        # print(self.contents)
+        self.item_vectors['Director'], self.item_norms['Director'] = self.compute_tf_idf('Director')
+        self.item_vectors['Actors'], self.item_norms['Actors'] = self.compute_tf_idf('Actors')
+        self.item_vectors['Writer'], self.item_norms['Writer'] = self.compute_tf_idf('Writer')
 
-    
-    def cosine_similarity(self, id1, id2):
+    def cosine_similarity(self, id1, id2, feature):
         sim = 0
-        for term in self.item_vectors[id1].keys():
-            if term in self.item_vectors[id2]:
-                sim += self.item_vectors[id1][term] * self.item_vectors[id2][term] 
+        for term in self.item_vectors[feature][id1].keys():
+            if term in self.item_vectors[feature][id2]:
+                sim += self.item_vectors[feature][id1][term] * self.item_vectors[feature][id2][term] 
 
         if sim == 0:
             # print(id1)
             return 0
         
-        return sim/(self.item_norms[id1] * self.item_norms[id2])
+        return sim/(self.item_norms[feature][id1] * self.item_norms[feature][id2])
 
-    def prediction(self, userid, itemid):
+    def prediction(self, userid, itemid, feature):
         sim_sum = 0
         numerador = 0
         # print(self.user_ratings[userid])
         
         for item, rating in self.user_ratings[userid].items():
-            if self.item_norms[item] != 0:
-                sim = self.cosine_similarity(item, itemid)
+            if self.item_norms[feature][item] != 0:
+                sim = self.cosine_similarity(item, itemid, feature)
                 sim_sum += sim
                 numerador += sim*rating
 
@@ -220,14 +241,23 @@ class Content():
         prediction = 0
         sum_weights = 0
         for item, rating in self.user_ratings[userid].items():
-            # if item in self.imdbRating.keys():
+            if item in self.imdbRating.keys():
             #     sum_weights += self.imdbRating[item]
-            #     prediction += rating*self.imdbRating[item]
-            # else:
-                sum_weights += 1
+                prediction += (rating+self.imdbRating[item])/2
+            else:
+                # sum_weights += 1
                 prediction += rating
-        prediction /= sum_weights #len(self.user_ratings[userid])
+        prediction /= len(self.user_ratings[userid])
         return prediction
+
+    def aggregate_predictions(self, predictions):
+        # ['Plot', 'Genre', 'Director', 'Year', 'Actors', 'Writer']
+        weights = [4, 3, 2, 4, 2, 2]
+        weighted_sum = 0
+        for i, pred in enumerate(predictions):
+            weighted_sum += weights[i]*pred
+        
+        return weighted_sum/np.sum(weights)
 
     def submission(self, targets_path):
         ''' Essa funcao itera pelas tuplas de usuarios e itens disponiveis no targets.csv
@@ -240,13 +270,18 @@ class Content():
         for row in df.itertuples():
             userid = row[1].split(":")[0]
             itemid = row[1].split(":")[1]
-
+            predictions = []
             if userid in self.user_ratings.keys():
-                if self.item_norms[itemid] != 0:
-                    prediction = self.prediction(userid, itemid)
-                if prediction == 0 or self.item_norms[itemid] == 0:
-                    prediction = self.input_avg_rating_user(userid)
-         
+                for feature in self.features:
+                    if self.item_norms[feature][itemid] != 0:
+                        pred = self.prediction(userid, itemid, feature)
+                        if pred != 0:
+                            predictions.append(pred)
+                    if pred == 0 or self.item_norms[feature][itemid] == 0:
+                        predictions.append(self.input_avg_rating_user(userid))
+            
+                prediction = self.aggregate_predictions(predictions)
+
                 if prediction > 10:
                     prediction = 10
                 elif prediction < 0:
