@@ -86,14 +86,27 @@ class Content():
                         'Released', 'Country', 'Actors', 'imdbRating', 'Type', 'Awards', 'Error']
 
         content_tokenized['Plot'] = []
-        if 'Plot' in content.keys():
+        if 'Plot' in content.keys() and content['Plot'] != 'N/A':
+            # if key == 'Director' or key == 'Actors' or key == 'Writer':  # como tratar os dados de nomes
+            # description = content['Director']
+            # if '(' in description:
+            #     flag_erase = 0
+            #     s = list(description)
+            #     for i in range(len(description)):
+            #         if description[i] == '(':
+            #             flag_erase = 1
+            #         if flag_erase == 1:
+            #             s[i] = ''
+            #         if description[i] == ')':
+            #             flag_erase = 0
+            #     description = "".join(s)
             description = self.preprocess_text(content['Plot'])
             tokens = self.tokenize(description, sep=' ')
             content_tokenized['Plot'] = tokens
             self.unique_words.update(tokens)
 
         if 'imdbRating' in content.keys() and content['imdbRating'] != 'N/A':
-            self.imdbRating[itemid] = content['imdbRating']
+            self.imdbRating[itemid] = float(content['imdbRating'])
             self.imdbAvgRating += float(content['imdbRating'])
 
         return content_tokenized['Plot']
@@ -205,9 +218,15 @@ class Content():
 
     def input_avg_rating_user(self, userid):
         prediction = 0
+        sum_weights = 0
         for item, rating in self.user_ratings[userid].items():
-            prediction += rating
-        prediction /= len(self.user_ratings[userid])
+            # if item in self.imdbRating.keys():
+            #     sum_weights += self.imdbRating[item]
+            #     prediction += rating*self.imdbRating[item]
+            # else:
+                sum_weights += 1
+                prediction += rating
+        prediction /= sum_weights #len(self.user_ratings[userid])
         return prediction
 
     def submission(self, targets_path):
