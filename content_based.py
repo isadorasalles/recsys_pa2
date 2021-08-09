@@ -10,7 +10,7 @@ class Content():
 
     def __init__(self):
         self.unique_words = set()
-        self.features = ['Plot', 'Genre', 'Director', 'Year', 'Actors', 'Writer']
+        self.features = ['Plot', 'Genre', 'Director', 'Year', 'Actors', 'Writer', 'Title']
 
     def read_ratings(self, ratings_path):
         ''' Essa funcao faz um pre-processamento do CSV que contem os ratings'''
@@ -27,31 +27,8 @@ class Content():
             self.user_ratings[userid][itemid] = int(row.Prediction)
 
     def preprocess_text(self, text):
-        # text = re.sub(r'\d+', '', text) # remove numeros 
-        # text = re.sub('([A-Z]{1})', r'\1', text).lower() # deixar tudo minusculo
-        # text = re.sub(u"[àáâãäå]", 'a', text)
-        # text = re.sub(u"[èéêë]", 'e', text)
-        # text = re.sub(u"[ìíîï]", 'i', text)
-        # text = re.sub(u"[òóôõö]", 'o', text)
-        # text = re.sub(u"[ùúûü]", 'u', text)
-        # s = list(text)
-        # for i, t in enumerate(s):
-        #     # if t == "'" and i < len(s) - 1:
-        #     #     s[i] = ' '
-        #     #     if s[i+1].isalpha():
-        #     #         s[i+1] = ''
-        #     # elif t == '-':
-        #     #     continue
-        #     if t in string.punctuation:  # remove pontuacoes
-        #         s[i] = ''
-
-        # text = "".join(s)
-        # text = text.replace('  ', ' ')
         text = text.translate(str.maketrans('', '', string.punctuation))
         return text.lower()
-        
-        # return text
-
 
     def tokenize(self, text, sep):
         stopwords_en = ['i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', "you're", "you've", "you'll", "you'd", 
@@ -70,9 +47,8 @@ class Content():
                         'won', "won't", 'wouldn', "wouldn't"]
 
         tokens = text.split(sep)
-        # print(tokens)
         tokens = [token for token in tokens if token not in list(string.punctuation)+stopwords_en and token != '']
-        # print(tokens)
+   
         return tokens
 
 
@@ -108,8 +84,12 @@ class Content():
             elif key == 'Year':
                 year = content[key][:3]
                 content_tokenized[key] = [year]
+                # if int(content[key][3:]) >= 5:
+                #     content_tokenized[key] = [str(int(year)+1)]
+                # if int(content[key][3:]) < 5:
+                #     content_tokenized[key] = [str(int(year)-1)]
                 # print(content_tokenized['Year'])
-                # self.unique_words.add(year)
+                self.unique_words.add(year)
 
             else: 
                 description = self.preprocess_text(content[key])
@@ -207,6 +187,10 @@ class Content():
         self.item_vectors['Director'], self.item_norms['Director'] = self.compute_tf_idf('Director')
         self.item_vectors['Actors'], self.item_norms['Actors'] = self.compute_tf_idf('Actors')
         self.item_vectors['Writer'], self.item_norms['Writer'] = self.compute_tf_idf('Writer')
+        self.item_vectors['Title'], self.item_norms['Title'] = self.compute_tf_idf('Title')
+        # self.item_vectors['Country'], self.item_norms['Country'] = self.compute_tf_idf('Country')
+
+
 
     def cosine_similarity(self, id1, id2, feature):
         sim = 0
@@ -252,7 +236,8 @@ class Content():
 
     def aggregate_predictions(self, predictions):
         # ['Plot', 'Genre', 'Director', 'Year', 'Actors', 'Writer']
-        weights = [4, 3, 3, 4, 2, 2]
+        # ['Plot', 'Genre', 'Director', 'Year', 'Actors', 'Writer', 'Title']
+        weights = [4, 3, 4, 5, 3, 2, 1]
         weighted_sum = 0
         for i, pred in enumerate(predictions):
             weighted_sum += weights[i]*pred
