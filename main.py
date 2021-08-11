@@ -4,10 +4,12 @@ import numpy as np
 from content_based import Content
 
 if __name__ == "__main__":
-    # leitura dos argumentos de entrada
+    # Read args
     contents_path = sys.argv[1]
     ratings_path = sys.argv[2]
     targets_path = sys.argv[3]
+
+    # Call the content-based recommender
     content = Content()
     content.read_ratings(ratings_path)
     content.read_content(contents_path)
