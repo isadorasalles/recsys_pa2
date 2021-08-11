@@ -10,7 +10,7 @@ class Content():
 
     def __init__(self):
         self.unique_words = set()
-        self.features = ['Plot', 'Genre', 'Director', 'Year', 'Actors', 'Writer', 'Title']
+        self.features = ['Genre', 'Director', 'Year', 'Actors', 'Writer', 'Title']
 
     def read_ratings(self, ratings_path):
         ''' Essa funcao faz um pre-processamento do CSV que contem os ratings'''
@@ -63,6 +63,8 @@ class Content():
                         'Released', 'Country', 'Actors', 'imdbRating', 'Type', 'Awards', 'Error']
         for key in self.features:
             if key not in content.keys() or content[key] == 'N/A':
+                if key == 'Director':
+                    self.count += 1
                 content_tokenized[key] = []
                 continue
             if key == 'Director' or key == 'Actors' or key == 'Writer':
@@ -89,14 +91,23 @@ class Content():
                 # if int(content[key][3:]) < 5:
                 #     content_tokenized[key] = [str(int(year)-1)]
                 # print(content_tokenized['Year'])
-                self.unique_words.add(year)
+            
+                self.years.append(int(content[key]))
+            
+            elif key == 'Runtime':
+                tokens = self.tokenize(content[key], sep=' ')
+                runtime = tokens[0][:-1]
+                if runtime == '':
+                    runtime = '0'
+                content_tokenized[key] = [runtime]
+                self.unique_words.add(runtime)
 
             else: 
                 description = self.preprocess_text(content[key])
                 tokens = self.tokenize(description, sep=' ')
                 content_tokenized[key] = tokens
                 # self.unique_words.update(tokens)
-
+        
         if 'imdbRating' in content.keys() and content['imdbRating'] != 'N/A':
             self.imdbRating[itemid] = float(content['imdbRating'])
             self.imdbAvgRating += float(content['imdbRating'])
@@ -166,7 +177,9 @@ class Content():
         self.imdbRating = {}
         self.imdbAvgRating = 0
         self.gendersAvgRating = {}
+        self.years = []
         i = 0
+        self.count = 0
         with open(contents_path, 'r') as f:
             
             for content in f:
@@ -174,23 +187,25 @@ class Content():
                     i+= 1
                     continue
                 itemid = content.split(',')[0]
-                self.contents[itemid] = self.preprocessing(json.loads(content[9:]), itemid)
 
+                content = json.loads(content[9:])
+                self.contents[itemid] = self.preprocessing(content, itemid)
+                # print(self.contents[itemid]['Runtime'])
         # print(self.unique_words)
         # print(len(self.unique_words))
         self.item_vectors = {}
         self.item_norms = {}
-        self.item_vectors['Plot'], self.item_norms['Plot'] = self.compute_tf_idf('Plot')
-        self.item_vectors['Genre'], self.item_norms['Genre'] = self.compute_tf_idf('Genre')
-        self.item_vectors['Year'], self.item_norms['Year'] = self.compute_tf_idf('Year')
-        # print(self.contents)
-        self.item_vectors['Director'], self.item_norms['Director'] = self.compute_tf_idf('Director')
-        self.item_vectors['Actors'], self.item_norms['Actors'] = self.compute_tf_idf('Actors')
-        self.item_vectors['Writer'], self.item_norms['Writer'] = self.compute_tf_idf('Writer')
-        self.item_vectors['Title'], self.item_norms['Title'] = self.compute_tf_idf('Title')
-        # self.item_vectors['Country'], self.item_norms['Country'] = self.compute_tf_idf('Country')
-
-
+        # self.item_vectors['Plot'], self.item_norms['Plot'] = self.compute_tf_idf('Plot')
+        # self.item_vectors['Genre'], self.item_norms['Genre'] = self.compute_tf_idf('Genre')
+        for feature in self.features:
+            self.item_vectors[feature], self.item_norms[feature] = self.compute_tf_idf(feature)
+        # self.item_vectors['Year'], self.item_norms['Year'] = self.compute_tf_idf('Year')
+        # # print(self.contents)
+        # self.item_vectors['Director'], self.item_norms['Director'] = self.compute_tf_idf('Director')
+        # self.item_vectors['Actors'], self.item_norms['Actors'] = self.compute_tf_idf('Actors')
+        # self.item_vectors['Writer'], self.item_norms['Writer'] = self.compute_tf_idf('Writer')
+        # self.item_vectors['Title'], self.item_norms['Title'] = self.compute_tf_idf('Title')
+        # self.item_vectors['Runtime'], self.item_norms['Runtime'] = self.compute_tf_idf('Runtime')
 
     def cosine_similarity(self, id1, id2, feature):
         sim = 0
@@ -229,15 +244,18 @@ class Content():
         prediction /= len(self.user_ratings[userid])
 
         if itemid in self.imdbRating.keys():
-            prediction += self.imdbRating[itemid]
-            prediction /= 2
+            # prediction += self.imdbRating[itemid]
+            # prediction /= 2
+            return self.imdbRating[itemid]
         
         return prediction
 
     def aggregate_predictions(self, predictions):
         # ['Plot', 'Genre', 'Director', 'Year', 'Actors', 'Writer']
         # ['Plot', 'Genre', 'Director', 'Year', 'Actors', 'Writer', 'Title']
-        weights = [4, 3, 4, 5, 4, 3, 4] 
+        # ['Plot', 'Director', 'Year', 'Actors', 'Writer', 'Title']
+        # ['Director', 'Year', 'Actors', 'Writer', 'Title', 'Rutime']
+        weights = [3, 4, 5, 3, 3, 4]  #[5, 5, 4.3, 3, 3, 0.1] 
         weighted_sum = 0
         for i, pred in enumerate(predictions):
             weighted_sum += weights[i]*pred
@@ -251,18 +269,26 @@ class Content():
         df = pd.read_csv(targets_path)
 
         print("UserId:ItemId,Prediction")
-
+        count = 0
+        count_2 = 0
+        item_set = set()
         for row in df.itertuples():
             userid = row[1].split(":")[0]
             itemid = row[1].split(":")[1]
             predictions = []
             if userid in self.user_ratings.keys():
+                count_2 += 1
                 for feature in self.features:
+                    pred = 0
                     if self.item_norms[feature][itemid] != 0:
                         pred = self.prediction(userid, itemid, feature)
                         if pred != 0:
                             predictions.append(pred)
+                    # print(feature)
                     if pred == 0 or self.item_norms[feature][itemid] == 0:
+                        if feature == "Writer":
+                            count += 1
+                            item_set.add(itemid)
                         predictions.append(self.input_avg_rating_user(userid, itemid))
             
                 prediction = self.aggregate_predictions(predictions)
@@ -276,7 +302,9 @@ class Content():
             elif itemid in self.imdbRating.keys():
                 prediction = self.imdbRating[itemid]
             else:
+                # count += 1
                 prediction = self.imdbAvgRating/len(self.imdbRating)
 
             print("{}:{},{}".format(userid, itemid, prediction))
-        
+        # print(count)
+        # print(len(item_set))

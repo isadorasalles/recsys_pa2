@@ -12,4 +12,3 @@ if __name__ == "__main__":
     content.read_ratings(ratings_path)
     content.read_content(contents_path)
     content.submission(targets_path)
-
