@@ -8,7 +8,7 @@ import re
 
 class Content():
 
-    def __init__(self, features=['Genre', 'Director', 'Year', 'Actors', 'Writer', 'Title'], weights=[3, 4, 5, 3, 3, 4] ):
+    def __init__(self, features=['Genre', 'Director', 'Year', 'Actors', 'Writer', 'Title'], weights=[3, 4, 5, 3, 3, 4]):
         
         self.features = features
         self.weights = weights
@@ -51,7 +51,6 @@ class Content():
         tokens = [token for token in tokens if token not in list(string.punctuation)+stopwords_en and token != '']
    
         return tokens
-
 
     def preprocessing(self, content, itemid):
         # Preprocess each type of content differently
@@ -133,7 +132,6 @@ class Content():
             idf[token] = np.log(N/count)
 
         return idf
-
 
     def compute_tf_idf(self, feature):
 
